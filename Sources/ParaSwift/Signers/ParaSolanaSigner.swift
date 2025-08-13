@@ -213,6 +213,34 @@ public class ParaSolanaSigner: ObservableObject {
             throw ParaSolanaSignerError.transactionCompilationFailed(underlyingError: error)
         }
     }
+    
+    /// Sign a raw base64-encoded serialized Solana transaction.
+    /// - Parameter base64Tx: The base64-encoded serialized transaction.
+    /// - Returns: A base64-encoded signed transaction.
+    /// - Throws: ParaSolanaSignerError if signing fails.
+    public func signSerializedTransaction(base64Tx: String) async throws -> String {
+        guard walletId != nil else {
+            throw ParaSolanaSignerError.missingWalletId
+        }
+
+        let args = SolanaSignTransactionArgs(b64EncodedTx: base64Tx)
+
+        do {
+            let result = try await paraManager.postMessage(method: "solanaWeb3SignTransaction", payload: args)
+
+            // Bridge returns base64 encoded signed transaction
+            guard let signedTxBase64 = result as? String else {
+                throw ParaSolanaSignerError.bridgeError("Invalid response from bridge")
+            }
+
+            return signedTxBase64
+        } catch let error as ParaWebViewError {
+            if error.localizedDescription.contains("not implemented") {
+                throw ParaSolanaSignerError.bridgeError("Solana transaction signing is not yet supported in the bridge")
+            }
+            throw ParaSolanaSignerError.signingFailed(underlyingError: error)
+        }
+    }
 
     /// Send a transaction to the network using the bridge
     /// - Parameter transaction: The SolanaTransaction to send
